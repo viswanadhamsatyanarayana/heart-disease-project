@@ -1,21 +1,48 @@
-from fastapi import FastAPI
 import joblib
-import numpy as np
+from fastapi import FastAPI
+from pydantic import BaseModel
 
 # Load model & scaler
-model = joblib.load("../model/best_model.pkl")
-scaler = joblib.load("../model/scaler.pkl")
+model = joblib.load("best_model.pkl")
+scaler = joblib.load("scaler.pkl")
 
-app = FastAPI()
+app = FastAPI(title="Heart Disease Prediction API")
+
+class InputData(BaseModel):
+    age: int
+    sex: int
+    cp: int
+    trestbps: int
+    chol: int
+    fbs: int
+    restecg: int
+    thalach: int
+    exang: int
+    oldpeak: float
+    slope: int
+    ca: int
+    thal: int
 
 @app.get("/")
-def home():
-    return {"message": "Heart Disease Prediction API"}
+def read_root():
+    return {"message": "Heart Disease Prediction API is running 🚀"}
 
 @app.post("/predict")
-def predict(data: dict):
-    # Example input: {"age": 55, "chol": 200, ...}
-    features = np.array([list(data.values())]).reshape(1, -1)
-    scaled_features = scaler.transform(features)
-    prediction = model.predict(scaled_features)
-    return {"prediction": int(prediction[0])}
+def predict(data: InputData):
+    input_data = [[
+        data.age, data.sex, data.cp, data.trestbps, data.chol,
+        data.fbs, data.restecg, data.thalach, data.exang,
+        data.oldpeak, data.slope, data.ca, data.thal
+    ]]
+
+    # Scale input
+    scaled_data = scaler.transform(input_data)
+
+    # Predict
+    prediction = model.predict(scaled_data)[0]
+    probability = model.predict_proba(scaled_data)[0][1]  # risk of disease
+
+    return {
+        "prediction": int(prediction),
+        "probability": float(probability)
+    }
