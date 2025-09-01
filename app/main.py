@@ -1,13 +1,19 @@
+import os
 import joblib
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-# Load model & scaler
-model = joblib.load("best_model.pkl")
-scaler = joblib.load("scaler.pkl")
+# Load model & scaler from environment variables
+model_path = os.environ.get("MODEL_PATH", "best_model.pkl")
+scaler_path = os.environ.get("SCALER_PATH", "scaler.pkl")
 
-app = FastAPI(title="Heart Disease Prediction API")
+model = joblib.load(model_path)
+scaler = joblib.load(scaler_path)
 
+# Initialize FastAPI app
+app = FastAPI(title="Heart Disease Prediction API 🚀")
+
+# Define input data structure
 class InputData(BaseModel):
     age: int
     sex: int
@@ -23,10 +29,12 @@ class InputData(BaseModel):
     ca: int
     thal: int
 
+# Root endpoint
 @app.get("/")
 def read_root():
     return {"message": "Heart Disease Prediction API is running 🚀"}
 
+# Predict endpoint
 @app.post("/predict")
 def predict(data: InputData):
     input_data = [[
@@ -38,11 +46,17 @@ def predict(data: InputData):
     # Scale input
     scaled_data = scaler.transform(input_data)
 
-    # Predict
-    prediction = model.predict(scaled_data)[0]
-    probability = model.predict_proba(scaled_data)[0][1]  # risk of disease
+    # Make prediction
+    prediction = model.predict(scaled_data)
+    probability = model.predict_proba(scaled_data)[0][1]  # probability of heart disease
 
     return {
-        "prediction": int(prediction),
-        "probability": float(probability)
+        "prediction": int(prediction[0]),
+        "probability": round(float(probability), 2)
     }
+
+# Optional: Run locally if needed
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
