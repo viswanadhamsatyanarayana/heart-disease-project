@@ -1,62 +1,57 @@
-import os
 import joblib
-from fastapi import FastAPI
-from pydantic import BaseModel
+import numpy as np
+import gradio as gr
 
-# Load model & scaler from environment variables
-model_path = os.environ.get("MODEL_PATH", "best_model.pkl")
-scaler_path = os.environ.get("SCALER_PATH", "scaler.pkl")
+# Load model & scaler
+model = joblib.load("best_model.pkl")
+scaler = joblib.load("scaler.pkl")
 
-model = joblib.load(model_path)
-scaler = joblib.load(scaler_path)
+# Prediction function
+def predict(age, sex, cp, trestbps, chol, fbs, restecg, thalach,
+            exang, oldpeak, slope, ca, thal):
+    try:
+        # Prepare input
+        input_data = np.array([[age, sex, cp, trestbps, chol, fbs, restecg,
+                                thalach, exang, oldpeak, slope, ca, thal]])
 
-# Initialize FastAPI app
-app = FastAPI(title="Heart Disease Prediction API 🚀")
+        # Scale
+        scaled_data = scaler.transform(input_data)
 
-# Define input data structure
-class InputData(BaseModel):
-    age: int
-    sex: int
-    cp: int
-    trestbps: int
-    chol: int
-    fbs: int
-    restecg: int
-    thalach: int
-    exang: int
-    oldpeak: float
-    slope: int
-    ca: int
-    thal: int
+        # Predict
+        prediction = model.predict(scaled_data)[0]
+        probability = model.predict_proba(scaled_data)[0][1]
 
-# Root endpoint
-@app.get("/")
-def read_root():
-    return {"message": "Heart Disease Prediction API is running 🚀"}
+        result = "⚠️ Heart Disease Detected" if prediction == 1 else "✅ No Heart Disease"
+        return f"{result}\n\nProbability: {round(probability*100, 2)} %"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
-# Predict endpoint
-@app.post("/predict")
-def predict(data: InputData):
-    input_data = [[
-        data.age, data.sex, data.cp, data.trestbps, data.chol,
-        data.fbs, data.restecg, data.thalach, data.exang,
-        data.oldpeak, data.slope, data.ca, data.thal
-    ]]
+# Define Gradio interface
+inputs = [
+    gr.Number(label="Age"),
+    gr.Radio([0, 1], label="Sex (0=Female, 1=Male)"),
+    gr.Number(label="Chest Pain Type"),
+    gr.Number(label="Resting BP"),
+    gr.Number(label="Cholesterol"),
+    gr.Radio([0, 1], label="Fasting Blood Sugar > 120mg/dl"),
+    gr.Number(label="Rest ECG"),
+    gr.Number(label="Max Heart Rate"),
+    gr.Radio([0, 1], label="Exercise Induced Angina"),
+    gr.Number(label="Oldpeak (ST Depression)"),
+    gr.Number(label="Slope of Peak Exercise ST Segment"),
+    gr.Number(label="Number of Major Vessels (0-3)"),
+    gr.Number(label="Thal (0=Normal, 1=Fixed defect, 2=Reversible defect)")
+]
 
-    # Scale input
-    scaled_data = scaler.transform(input_data)
+outputs = gr.Textbox(label="Prediction Result")
 
-    # Make prediction
-    prediction = model.predict(scaled_data)
-    probability = model.predict_proba(scaled_data)[0][1]  # probability of heart disease
+iface = gr.Interface(
+    fn=predict,
+    inputs=inputs,
+    outputs=outputs,
+    title="💓 Heart Disease Prediction AI",
+    description="Enter patient data to predict the risk of heart disease."
+)
 
-    return {
-        "prediction": int(prediction[0]),
-        "probability": round(float(probability), 2)
-    }
-
-# Optional: Run locally if needed
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    iface.launch()

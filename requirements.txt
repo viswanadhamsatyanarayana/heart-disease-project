@@ -1,7 +1,4 @@
-fastapi
-uvicorn
+gradio
 scikit-learn
-joblib
 numpy
-pandas
-matplotlib
+joblib
