@@ -1,4 +1,6 @@
 gradio
 scikit-learn
+pandas
 numpy
+matplotlib
 joblib
